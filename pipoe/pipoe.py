@@ -270,15 +270,9 @@ def pkg_size(pkg):
     return pkg["size"] * 10000
 
 
-def fetch_requirements_from_remote_package(info, version):
+def fetch_requirements_from_remote_package(url, version):
     """ Looks up requires_dist from an actual package """
-
-    # Version must exists, otherwise previous steps failed
-    pkg_versions = info["releases"][version]
-
-    # If we must fetch a package, lets fetch the smallest one
-    pkg_url = sorted(pkg_versions, key=pkg_size, reverse=False)[0]["url"]
-    filename = pkg_url.split("/")[-1]
+    filename = url.split("/")[-1]
 
     # Select the appropriate parser from pkginfo based on the filename
     parse = None
@@ -294,7 +288,7 @@ def fetch_requirements_from_remote_package(info, version):
     # Download the package and read the MANIFEST
     with tempfile.TemporaryDirectory() as directory:
         path = os.path.join(directory, filename)
-        urllib.request.urlretrieve(pkg_url, path)
+        urllib.request.urlretrieve(url, path)
         return parse(path).requires_dist
 
 
@@ -387,14 +381,13 @@ def get_package_info(
         author_email = info["info"]["author_email"]
         license = translate_license(info["info"]["license"], default_license)
 
-        try:
-            version_info = next(
-                i for i in info["releases"][version] if i["packagetype"] == "sdist"
-            )
-        except:
+        for url in info['urls']:
+            if url['packagetype'] == 'sdist':
+                src_uri = url['url']
+                break
+        else:
             raise Exception("No sdist package can be found.")
 
-        src_uri = version_info["url"]
         src_md5, src_sha256, src_dir, license_file, license_md5, build_deps = get_package_file_info(
             package_name, version, src_uri
         )
@@ -403,7 +396,7 @@ def get_package_info(
 
         # Only parse if requires_dist is missing, e.g. sentry-sdk
         if requires_dist is None:
-            requires_dist = fetch_requirements_from_remote_package(info, version)
+            requires_dist = fetch_requirements_from_remote_package(src_uri, version)
 
         dependencies = get_package_dependencies(requires_dist, follow_extras=follow_extras)
 
