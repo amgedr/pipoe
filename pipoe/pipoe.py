@@ -379,7 +379,15 @@ def get_package_info(
         homepage = info["info"]["home_page"]
         author = info["info"]["author"]
         author_email = info["info"]["author_email"]
-        license = translate_license(info["info"]["license"], default_license)
+
+        license_name = info["info"]["license"]
+        if not license_name:
+            # if license field is empty search the classifiers for a license
+            classifier_str = "License :: OSI Approved :: "
+            for classifier in info["info"]["classifiers"]:
+                if classifier.startswith(classifier_str):
+                    license_name = classifier.replace(classifier_str, "")
+        license = translate_license(license_name, default_license)
 
         for url in info['urls']:
             if url['packagetype'] == 'sdist':
